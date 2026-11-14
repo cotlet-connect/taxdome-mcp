@@ -1,0 +1,14 @@
+---
+description: Work in Squire through Cotlet.dev
+globs:
+alwaysApply: false
+---
+
+# Squire through Cotlet.dev
+
+- Start with `list_barbers` and `list_services`: their ids feed every booking tool.
+- Times are in the shop's time zone, YYYY-MM-DDTHH:MM:SS. Follow `next_cursor` until it is null.
+- `create_appointment`, `reschedule_appointment` and `cancel_appointment` wait for the user's OK in the Cotlet console.
+- `block_time` does not clear bookings already in its window: call `list_appointments` first.
+- When a whole day moves, go one booking at a time, so each client hears about a single change.
+- Return client phone and email only when the user asks for them.
