@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Squire through Cotlet.dev: stdio MCP server and small CLI over the hosted Cotlet.dev MCP server (stdlib only).
+"""TaxDome through Cotlet.dev: stdio MCP server and small CLI over the hosted Cotlet.dev MCP server (stdlib only).
 
-Every tool forwards to the hosted call the Squire page documents: squire_read or squire_write with
-{"operation": <tool>, "arguments": {...}}. Source: https://cotlet.dev/integrations/squire-api-mcp-server
+Every tool forwards to the hosted call the TaxDome page documents: taxdome_read or taxdome_write with
+{"operation": <tool>, "arguments": {...}}. Source: https://cotlet.dev/integrations/taxdome-api-mcp-server
 """
 import argparse
 import json
@@ -11,11 +11,11 @@ import sys
 import urllib.error
 import urllib.request
 
-SLUG = "squire"
-NAME = "Squire"
+SLUG = "taxdome"
+NAME = "TaxDome"
 URL = "https://cotlet.dev/mcp/v1"
-PAGE = "https://cotlet.dev/integrations/squire-api-mcp-server"
-KEY_HELP = "Set COTLET_API_KEY. Create a Cotlet API key with access to Squire in your Cotlet console: https://cotlet.dev"
+PAGE = "https://cotlet.dev/integrations/taxdome-api-mcp-server"
+KEY_HELP = "Set COTLET_API_KEY. Create a Cotlet API key with access to TaxDome in your Cotlet console: https://cotlet.dev"
 VERSION = "1.1.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 
@@ -36,74 +36,22 @@ def _obj(props, required=()):
 DATE = "YYYY-MM-DD"
 ASKS_FIRST = " Waits for your OK in the Cotlet console before it runs."
 
-# The 11 Squire tools of the live page: (name, side, description, input schema).
+# The 14 TaxDome tools of the live page: (name, side, description, input schema).
 TOOLS = [
-    ("list_barbers", "read",
-     "List the barbers on your shop's team. Returns each barber with id and name. Use the ids in the appointment "
-     "tools. Reads the team as your signed-in account sees it in Commander.",
-     _obj({})),
-    ("list_services", "read",
-     "List the services on your shop's service menu. Returns each service with id, name, duration in minutes and "
-     "price as shown in Squire, in menu order. Use the service ids when you book.",
-     _obj({"barber_id": _s("Only services this barber offers.")})),
-    ("list_appointments", "read",
-     "List appointments for a day or a date range, optionally for one barber. Returns appointments in time order "
-     "with client name, barber, services, start and end. Follow next_cursor until it is null. Blocked time is "
-     "listed with type blocked so you can tell it from a booking.",
-     _obj({"date_from": _s("First day, %s." % DATE),
-           "date_to": _s("Last day, %s. Defaults to date_from." % DATE),
-           "barber_id": _s("Only this barber. Omit for the whole shop."),
-           "cursor": _s("next_cursor from the previous page.")}, ["date_from"])),
-    ("create_appointment", "write",
-     "Book an appointment for a client with a barber. Books the slot and returns the appointment. It fails with "
-     "SLOT_TAKEN if the barber is booked or blocked then, and nothing is created. Payments are not part of this "
-     "call." + ASKS_FIRST,
-     _obj({"client_id": _s("Client id from list_clients."),
-           "barber_id": _s("Barber id from list_barbers."),
-           "service_ids": {"type": "array", "items": {"type": "string"},
-                           "description": "Service ids from list_services."},
-           "start": _s("Start time, YYYY-MM-DDTHH:MM:SS in the shop's time zone.")},
-          ["client_id", "barber_id", "service_ids", "start"])),
-    ("reschedule_appointment", "write",
-     "Move an appointment to a new time or another barber. Moves the booking and returns it with the new times. "
-     "It fails with SLOT_TAKEN when the new slot is not free, and the original stays." + ASKS_FIRST,
-     _obj({"appointment_id": _s("Appointment id from list_appointments."),
-           "start": _s("New start time, YYYY-MM-DDTHH:MM:SS."),
-           "barber_id": _s("New barber. Omit to keep the same one.")}, ["appointment_id", "start"])),
-    ("cancel_appointment", "write",
-     "Cancel a client's appointment. Cancels the booking and returns its new status. Cotlet takes no payment and "
-     "issues no refund." + ASKS_FIRST,
-     _obj({"appointment_id": _s("Appointment id from list_appointments."),
-           "reason": _s("Short note kept with the cancellation.")}, ["appointment_id"])),
-    ("block_time", "write",
-     "Block a barber's calendar for a time window. Blocks the window so no one can book it and returns the block. "
-     "It does not touch existing bookings: check list_appointments first. Undo it with remove_block.",
-     _obj({"barber_id": _s("Barber id from list_barbers."),
-           "start": _s("Start, YYYY-MM-DDTHH:MM:SS."),
-           "end": _s("End, YYYY-MM-DDTHH:MM:SS.")}, ["barber_id", "start", "end"])),
-    ("remove_block", "write",
-     "Remove a blocked time window from a barber's calendar. Reopens the window for booking. The block can be set "
-     "again with block_time.",
-     _obj({"block_id": _s("Block id from block_time or list_appointments.")}, ["block_id"])),
-    ("list_waitlist", "read",
-     "List clients on the shop's waitlist. Returns each waiting client with the barber and the day they asked "
-     "for, in the order Squire shows them. Squire notifies the waiting client itself when a slot opens. The "
-     "waitlist needs a Squire plan that includes it; on others the call returns an empty list.",
-     _obj({"barber_id": _s("Only clients waiting for this barber.")})),
-    ("list_clients", "read",
-     "List or search your shop's clients. Returns clients with id, name, phone, email and last visit date, as "
-     "Squire shows them. Phone and email are personal data: return them only when the user asks for them. "
-     "Follow next_cursor until it is null.",
-     _obj({"query": _s("Name, phone or email to search for."),
-           "cursor": _s("next_cursor from the previous page.")})),
-    ("get_revenue_report", "read",
-     "Read revenue and client retention from the Reporting Dashboard for a date range. Returns revenue and "
-     "returning clients, and per barber when group_by is barber. Figures are in the shop's currency. It reads "
-     "the report only and moves no money.",
-     _obj({"date_from": _s("First day, %s." % DATE),
-           "date_to": _s("Last day, %s." % DATE),
-           "group_by": {"type": "string", "enum": ["barber"],
-                        "description": "Split by barber. Omit for shop totals."}}, ["date_from", "date_to"])),
+    ("list_accounts", "read", "TaxDome operation list_accounts. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("create_account", "write", "TaxDome operation create_account. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("update_account", "write", "TaxDome operation update_account. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("list_pipelines", "read", "TaxDome operation list_pipelines. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("list_jobs", "read", "TaxDome operation list_jobs. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("create_job", "write", "TaxDome operation create_job. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("update_job", "write", "TaxDome operation update_job. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("list_tasks", "read", "TaxDome operation list_tasks. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("create_task", "write", "TaxDome operation create_task. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("list_requests", "read", "TaxDome operation list_requests. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("send_request", "write", "TaxDome operation send_request. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("list_invoices", "read", "TaxDome operation list_invoices. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("send_invoice", "write", "TaxDome operation send_invoice. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
+    ("send_message", "write", "TaxDome operation send_message. Uses the signed-in TaxDome account through Cotlet.", _obj({})),
 ]
 BY_NAME = {t[0]: t for t in TOOLS}
 
@@ -176,7 +124,7 @@ class Client:
 
 
 def forward(client, name, args):
-    """One Squire tool as the hosted call: squire_read or squire_write with the operation and its arguments."""
+    """One TaxDome tool as the hosted call: taxdome_read or taxdome_write with the operation and its arguments."""
     _, side, _, _ = BY_NAME[name]
     return client.call("%s_%s" % (SLUG, side), {"operation": name, "arguments": args})
 
@@ -222,8 +170,8 @@ class Server:
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": SLUG + "-mcp", "version": VERSION},
                 "instructions": (
-                    "Squire through Cotlet.dev: 11 tools for barbers, services, appointments, blocked time, the "
-                    "waitlist, clients and the revenue report, in the user's own Squire account. Bookings, moves "
+                    "TaxDome through Cotlet.dev: 14 tools for accounts, services, appointments, blocked time, the "
+                    "waitlist, clients and the revenue report, in the user's own TaxDome account. Writes "
                     "and cancellations wait for the user's OK in the Cotlet console. Phone and email of clients "
                     "only when the user asks. Set COTLET_API_KEY. More: " + PAGE
                 ),
@@ -272,12 +220,12 @@ def connect():
 
 
 def main():
-    p = argparse.ArgumentParser(description="Squire through Cotlet.dev")
+    p = argparse.ArgumentParser(description="TaxDome through Cotlet.dev")
     sub = p.add_subparsers(dest="cmd")
     sub.add_parser("serve", help="start the stdio MCP server (same as no argument)")
     sub.add_parser("connect", help="print the hosted setup for Claude Code, Cursor, Codex and chat apps")
-    sub.add_parser("tools", help="list the 11 Squire tools")
-    c = sub.add_parser("call", help="run one Squire tool, e.g. call list_barbers")
+    sub.add_parser("tools", help="list the 14 TaxDome tools")
+    c = sub.add_parser("call", help="run one TaxDome tool, e.g. call list_accounts")
     c.add_argument("tool", choices=sorted(BY_NAME))
     c.add_argument("arguments", nargs="?", default="{}", help="JSON object of inputs")
     args = p.parse_args()

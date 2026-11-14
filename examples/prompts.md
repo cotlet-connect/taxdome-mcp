@@ -1,4 +1,4 @@
-# Example prompts for Squire
+# Example prompts for TaxDome
 
 - Brief each barber's day at 7 am: every booking with client, services, start and end.
 - Book waitlist clients into the gaps in tomorrow's schedule, after I approve each booking.

@@ -6,9 +6,9 @@
         "Authorization": "Bearer ${COTLET_API_KEY}"
       }
     },
-    "squire": {
+    "taxdome": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/cotlet-connect/squire-mcp", "squire-mcp"],
+      "args": ["--from", "git+https://github.com/cotlet-connect/taxdome-mcp", "taxdome-mcp"],
       "env": {
         "COTLET_API_KEY": "${COTLET_API_KEY}"
       }
