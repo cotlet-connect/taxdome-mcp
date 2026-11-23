@@ -24,7 +24,7 @@ Unofficial: Cotlet is independent and **not affiliated with TaxDome**.
 2. **Add the Cotlet address.** Paste `https://cotlet.dev/mcp/v1` into your agent as an MCP server or connector.
 3. **Approve the connection.** Chat apps send you to a Cotlet sign-in. Code editors, n8n and scripts take an API key from the console.
 
-TaxDome shares one address, `https://cotlet.dev/mcp/v1`, with every other app on your Cotlet account. If you enable TaxDome after connecting the agent, refresh the connector so the TaxDome tools appear. Free 7-day trial with 2,000 credits, no card needed.
+TaxDome shares one address, `https://cotlet.dev/mcp/v1`, with every other app on your Cotlet account. If you enable TaxDome after connecting the agent, refresh the connector so the TaxDome tools appear. Free 7-day trial, no card needed.
 
 ### Claude
 
